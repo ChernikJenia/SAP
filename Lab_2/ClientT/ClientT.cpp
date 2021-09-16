@@ -2,6 +2,7 @@
 #include "Winsock2.h"
 #include <string>
 #include <tchar.h>
+#include <comdef.h> 
 #include "../ErrorMessageLib/framework.h"
 
 #pragma comment(lib, "WS2_32.lib")
@@ -11,12 +12,13 @@
 using namespace std;
 
 
-int main(int argc, _TCHAR* argv[])
+int main(int argc, char* argv[])
 {
     system("chcp 1251>nul");
 
     WSADATA wsaData;
     SOCKET cS;
+    
     try
     {
         if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
@@ -25,10 +27,17 @@ int main(int argc, _TCHAR* argv[])
         if ((cS = socket(AF_INET, SOCK_STREAM, NULL)) == INVALID_SOCKET)
             throw SetErrorMsgText("Socket: ", WSAGetLastError());
 
+        const char* serverAddress = "127.0.0.1";
+
+        if (argc > 1)
+        {
+            serverAddress = argv[1];
+        }
+
         SOCKADDR_IN serv;
         serv.sin_family = AF_INET;
         serv.sin_port = htons(2000);
-        serv.sin_addr.s_addr = inet_addr("127.0.0.1");
+        serv.sin_addr.s_addr = inet_addr(serverAddress);
 
         if (connect(cS, (sockaddr*)&serv, sizeof(serv)) == INVALID_SOCKET)
             throw SetErrorMsgText("connect: ", WSAGetLastError());
