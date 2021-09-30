@@ -1,6 +1,7 @@
 ﻿#include <iostream>
 #include "Winsock2.h"
 #include <string>
+#include <vector>
 #include "../../Lab_2/ErrorMessageLib/framework.h"
 
 #pragma comment(lib, "WS2_32.lib")
@@ -13,27 +14,68 @@
 using namespace std;
 
 SOCKET sS;
-SOCKET serverTest;
 
-bool GetServer(char* call, short port, struct sockaddr* from, int* flen)
+void SearchForServers(char* call, short port)
 {
-    int lb = 0;
-    char bfrom[50]{};
+    SOCKET serverTest;
+    int lb = 0,
+        lc = 0, 
+        optval = 1,
+        timeout = 3000;
+    vector<string> serversIP;
+
+    if ((serverTest = socket(AF_INET, SOCK_DGRAM, NULL)) == INVALID_SOCKET)
+            throw SetErrorMsgText("Socket: ", WSAGetLastError());
 
 
-    if ((lb = sendto(serverTest, CALL, strlen(CALL), NULL, from, *flen)) == SOCKET_ERROR)
-        throw SetErrorMsgText("sendto: ", WSAGetLastError());
+    // По умолчанию использование стандартного широковещательного адреса не допускается и для его применения необходимо
+    // использовать эту функцию
 
+    if (setsockopt(serverTest, SOL_SOCKET, SO_BROADCAST, (char*)&optval, sizeof(int)) == SOCKET_ERROR)
+        throw SetErrorMsgText("opt: ", WSAGetLastError());
 
-    if ((lb = recvfrom(serverTest, bfrom, sizeof(bfrom), NULL, from, flen)) == SOCKET_ERROR)
+    if(setsockopt(serverTest, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(int)) == SOCKET_ERROR)
+        throw SetErrorMsgText("opt: ", WSAGetLastError());
+
+    SOCKADDR_IN all;
+    lc = sizeof(all);
+    all.sin_family = AF_INET;
+    all.sin_port = htons(PORT);
+    all.sin_addr.s_addr = INADDR_BROADCAST;
+
+     if ((lb = sendto(serverTest, CALL, strlen(CALL) + 1, NULL, (sockaddr*)&all, lc)) == SOCKET_ERROR)
+            throw SetErrorMsgText("sendto: ", WSAGetLastError());
+      
+    while (true)
     {
-        if (WSAGetLastError() == WSAETIMEDOUT)
-            return false;
+        char bfrom[50]{};
 
-        throw SetErrorMsgText("GetRequestFromClient: ", WSAGetLastError());
+        if ((lb = recvfrom(serverTest, bfrom, sizeof(bfrom), NULL, (sockaddr*)&all, &lc)) == SOCKET_ERROR)
+        {
+            if (WSAGetLastError() == WSAETIMEDOUT)
+            {
+                if (serversIP.size() > 0) {
+                    cout << "There are " << serversIP.size() << " available on " << port << " port: " << endl;
+
+                    for (auto s : serversIP) {
+                        cout << "\t" << s << endl;
+                    }
+                }
+                else {
+                    cout << "There are no more servers available on " << port << " port" << endl;
+                }
+
+                return;
+            }
+
+            throw SetErrorMsgText("GetRequestFromClient: ", WSAGetLastError());
+        }
+
+        if (strcmp(CALL, bfrom) == 0) {
+            serversIP.push_back(inet_ntoa(all.sin_addr));
+        }
     }
-
-    return strcmp(CALL, bfrom) == 0;
+   
 }
 
 
@@ -101,34 +143,7 @@ int main(int argc, char* argv[])
         if(bind(sS, (LPSOCKADDR)&serv, sizeof(serv)) == SOCKET_ERROR)
             throw SetErrorMsgText("bind: ", WSAGetLastError());
 
-
-#pragma region ServerTest
-        //// ПроверОчка на наличие ещё 1 сервера с тамим же позывным
-        //if ((serverTest = socket(AF_INET, SOCK_DGRAM, NULL)) == INVALID_SOCKET)
-        //    throw SetErrorMsgText("Socket: ", WSAGetLastError());
-
-
-        //// По умолчанию использование стандартного широковещательного адреса не допускается и для его применения необходимо
-        //// использовать эту функцию
-        //if (setsockopt(serverTest, SOL_SOCKET, SO_BROADCAST, (char*)&optval, sizeof(int)) == SOCKET_ERROR)
-        //    throw SetErrorMsgText("opt: ", WSAGetLastError());
-
-        //SOCKADDR_IN all;
-        //lc = sizeof(all);
-        //all.sin_family = AF_INET;
-        //all.sin_port = htons(PORT);
-        //all.sin_addr.s_addr = INADDR_BROADCAST;
-
-        //if (GetServer(CALL, PORT, (sockaddr*)&all, &lc))
-        //{
-        //    cout << "There is one more Server with the same call sign" << endl;;
-        //}
-        //else
-        //{
-        //    cout << "There is no Server with the same call sign" << endl;
-        //}
-#pragma endregion
-
+       SearchForServers(CALL, PORT);
 
         cout << "Server is listening to " << PORT << " port..." << endl;
 
