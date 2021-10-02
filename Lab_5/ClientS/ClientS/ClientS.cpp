@@ -16,7 +16,7 @@ SOCKET cS;
 
 bool GetServerByName(char* name, char* call, SOCKADDR_IN* from, int &flen)
 {
-    int lb = 0, i = 0;
+    int lb = 0, i = 0, timeout = 3000;
     char bfrom[50]{};
     struct in_addr addr;
     hostent* server = gethostbyname(name);
@@ -35,10 +35,13 @@ bool GetServerByName(char* name, char* call, SOCKADDR_IN* from, int &flen)
     from->sin_addr.s_addr = inet_addr(inet_ntoa(addr));
 
 
+    if (setsockopt(cS, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(int)) == SOCKET_ERROR)
+        throw SetErrorMsgText("opt: ", WSAGetLastError());
+
+
     if ((lb = sendto(cS, CALL, strlen(CALL) + 1, NULL, (sockaddr*)from, flen)) == SOCKET_ERROR)
         throw SetErrorMsgText("sendto: ", WSAGetLastError());
 
-    cout << "Waiting for response...(maybe you need to restart CLientB)" << endl;
 
     if ((lb = recvfrom(cS, bfrom, sizeof(bfrom), NULL, (sockaddr*)from, &flen)) == SOCKET_ERROR)
     {
@@ -67,10 +70,10 @@ int main(int argc, char* argv[])
         if ((cS = socket(AF_INET, SOCK_DGRAM, NULL)) == INVALID_SOCKET)
             throw SetErrorMsgText("Socket: ", WSAGetLastError());
 
-        SOCKADDR_IN from;
-        int lc = sizeof(from);
-        from.sin_family = AF_INET;
-        from.sin_port = htons(PORT);
+        SOCKADDR_IN server;
+        int lc = sizeof(server);
+        server.sin_family = AF_INET;
+        server.sin_port = htons(PORT);
 
         if (argc < 2) {
             cout << "Error: specify a server name\n";
@@ -78,7 +81,11 @@ int main(int argc, char* argv[])
             return 0;
         }
 
-        if (!GetServerByName(argv[1], CALL, &from, lc)) {
+
+        if (GetServerByName(argv[1], CALL, &server, lc)) {
+            cout << "server (" << argv[1] << ") " << inet_ntoa(server.sin_addr) << " responded" << endl;
+        }
+        else {
             cout << "Can't find such a server\n";
         }
 
