@@ -7,7 +7,7 @@
 #pragma comment(lib, "../ServerMS/debug/MailslotErrors.lib")
 
 #define MAILSLOT_NAME TEXT("\\\\.\\mailslot\\BOX")
-#define MAX_MESSAGE_LENGTH 500
+#define MAX_MESSAGE_LENGTH 300
 
 int main()
 {
